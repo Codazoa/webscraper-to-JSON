@@ -4,88 +4,79 @@
 import os
 import sys
 from bs4 import BeautifulSoup
-from lxml import etree
+import json
 import requests
 import re
 
-def setAction(whatAction):
-    """ Setting up action for api call """
-    return 'action='+whatAction+'&'
+class JSONRunner (object):
+    def __init__(self, filename):
+        self.jsonFileName = filename
+        self.jsonHeading = 'webdata'
+        self.titleList = ''
+        self.__createJson(self.jsonFileName)
 
-def setFormat(whatFormat):
-    """ Setting up format for api call """
-    return 'format='+whatFormat+'&'
+    def __createJson(self, filename):
+        with open(filename, "x") as newfile:
+            jsonDict = { self.jsonHeading : []}
+            print(jsonDict)
+            json.dump(jsonDict, newfile, indent = 2)
 
-def searchFor(searchTerms, limit):
-    """ Setting up terms for search api call """
-    return 'search='+searchTerms+'&limit='+limit+'&'
+    def writeToJson(self, data):
+        filename = self.jsonFileName
+        with open(filename, 'r+') as outfile:
+            file_data = json.load(outfile)
+            print(file_data)
+            file_data[ self.jsonHeading ].append(data)
+            outfile.seek(0)
+            json.dump(file_data, outfile, indent = 2)
 
-def titles(whatTitles):
-    """ Setting up titles for query api call """
-    listOfTitles = ''
-    for title in whatTitles:
-        listOfTitles += title+"|"
-    return 'titles='+listOfTitles[:-1]+'&'
 
-def getPage(url):
-    """ Returns page contents for given url """
-    page = requests.get(url)
-    return page
+class WebScraper (object):
+    def __init__(self, startingUrl):
+        self.startingUrl = startingUrl
 
-def searchWikiURL(wikiURL, searchTerms, limit):
-    """ Runs a search api call """
-    return wikiURL+setAction('opensearch')+setFormat('xml')+searchFor(searchTerms, limit)
+    def getLinkList(self, url):
+        """ finds all the links on a page and appends them to a list
+            from cs224 programming tools assignment
+        """
+        page = BeautifulSoup(requests.get(url).text, 'html.parser')
+        body = page.find(id="bodyContent")
+        list = []
+        for link in body.find_all('a', href=filterLinks):
+            list.append('https://en.wikipedia.org' + link.get('href'))
+        return list
 
-def queryWikiURL(wikiURL, queryTerms):
-    """ Runs a query api call """
-    return wikiURL+setAction('query')+setFormat('xml')+titles(queryTerms)
+    def filterLinks(self, href):
+        """ returns true if href is an internal link in wikipedia, false if not
+            from cs224 programming tools assignment
+        """
+        if href:
+            if re.compile('^/wiki/').search(href):
+                if not re.compile('/\w+:').search(href):
+                    if not re.compile('#').search(href):
+                        return True
+        return False
 
-def strip_ns(tree):
-    """ Strips namespace from xml output """
-    for node in tree.iter():
-        try:
-            has_namespace = node.tag.startswith('{')
-        except AttributeError:
-            continue
-        if has_namespace:
-            node.tag = node.tag.split('}', 1)[1]
+    def searchWikiURL(self, wikiURL, searchTerms, limit):
+        return wikiURL+setAction('opensearch')+setFormat('xml')+searchFor(searchTerms, limit)
 
-def getLinkList(url):
-    """ finds all the links on a page and appends them to a list
-        from cs224 programer tools assignment
-    """
-    page = BeautifulSoup(requests.get(url).text, 'html.parser')
-    body = page.find(id="bodyContent")
-    list = []
-    for link in body.find_all('a', href=filterLinks):
-        list.append('https://en.wikipedia.org' + link.get('href'))
-    return list
-
-def filterLinks(href):
-    """ returns true if href is an internal link in wikipedia, false if not
-        from cs224 programer tools assignment
-    """
-    if href:
-        if re.compile('^/wiki/').search(href):
-            if not re.compile('/\w+:').search(href):
-                if not re.compile('#').search(href):
-                    return True
-    return False
+    def queryWikiURL(self, wikiURL, queryTerms):
+        return wikiURL+setAction('query')+setFormat('xml')+titles(queryTerms)
 
 def main():
-    # startingUrl = 'https://en.wikipedia.org/wiki/Lists_of_video_games'
-
-    # links = getLinkList(startingUrl)
-    # for link in links:
-    #     print(link)
-
-    wiki = "https://en.wikipedia.org/w/api.php?"
-    url = queryWikiURL(wiki, ['Gex (video game)'])
-    print(url)
-    rawPage = getPage(url)
-    print(rawPage.text)
+    scraper = WebScraper('https://en.wikipedia.org/wiki/Lists_of_video_games')
+    jsonwriter = JSONRunner("jsontest.json")
 
 
+    # scraper code
+    # search through the list
+    # get title
+    # check if title exists in our database
+    # search title
+    # get url
+    # query title
+    # get content
+    #
 
     # rawPage = getPage(wikiURL)
     # print(rawPage.text)
